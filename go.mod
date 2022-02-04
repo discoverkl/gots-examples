@@ -4,7 +4,7 @@ go 1.17
 
 require (
 	github.com/boltdb/bolt v1.3.1
-	github.com/discoverkl/gots v0.1.0
+	github.com/discoverkl/gots v0.1.2
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 )
 
