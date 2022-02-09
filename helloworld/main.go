@@ -48,6 +48,7 @@ func promptRunMod() string {
 		case '3':
 			return "online"
 		case 'q':
+			os.Exit(0)
 		default:
 			os.Exit(0)
 		}
