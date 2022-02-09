@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/fs"
 	"log"
 	"net/http"
 	"os"
@@ -14,15 +13,14 @@ import (
 	"github.com/discoverkl/gots/ui"
 )
 
-//go:embed fe/dist
-var root embed.FS
+//go:embed index.html
+var www embed.FS
 
 func add(a, b int) int {
 	return a + b
 }
 
 func main() {
-	www, _ := fs.Sub(root, "fe/dist")
 	app := ui.New(
 		ui.Mode(promptRunMod()),
 		ui.Root(http.FS(www)),
@@ -43,12 +41,11 @@ func promptRunMod() string {
 			}
 			log.Fatal(err)
 		}
-
 		switch ch {
-		case '1':
-			return "page"
-		case '2':
+		case '1', 10:
 			return "app"
+		case '2':
+			return "page"
 		case '3':
 			return "online"
 		case 'q':
@@ -61,8 +58,8 @@ func promptRunMod() string {
 const promptText = `
 *** Commands ***
 
-1: LocalPage - start a local web server, open its' serving url with your default web browser
-2: LocalApp - start a local web server, open its' serving url within a native app (which is a chrome process)
+1: LocalApp - start a local web server, open its' serving url within a native app
+2: LocalPage - start a local web server, open its' serving url with your default web browser
 3: Online   - run a online web server
 
 Please enter (1-3)? `
