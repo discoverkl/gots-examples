@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"net/http"
 	"os"
 
 	"github.com/discoverkl/gots/ui"
@@ -23,7 +22,7 @@ func add(a, b int) int {
 func main() {
 	app := ui.New(
 		ui.Mode(promptRunMod()),
-		ui.Root(http.FS(www)),
+		ui.Root(www),
 		ui.OnlineAddr(":8000"),
 	)
 	app.BindFunc("add", add)
