@@ -50,7 +50,6 @@ func promptRunMod() string {
 		case 'q':
 			os.Exit(0)
 		default:
-			os.Exit(0)
 		}
 	}
 }
