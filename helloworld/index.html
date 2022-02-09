@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+
+<html>
+    <head><title>Go and TypeScript</title></head>
+    <body>
+        <h1>Hello World!</h1>
+
+        <p style="font-size: 40px;" id="sum"></span>
+
+        <!-- Step 1: export Gots to window object -->
+        <script src="https://cdn.jsdelivr.net/npm/ts2go@1.0.0/ts2go.js"></script>
+
+        <script>
+          function rand() {
+            return Math.floor(Math.random() * 100);
+          }
+          async function main() {
+            // Step 2: create a rpc client
+            const api = await Gots.getapi()
+
+            // Step 3: call remote go function: add
+            let a = rand(), b = rand();
+            document.getElementById("sum").innerText = a + " + " + b + " = " + await api.add(a, b)
+          }
+          main()
+        </script>
+    </body>
+
+</html>
