@@ -6,7 +6,6 @@ import NoteList from './components/NoteList.vue'
 import { NoteItem, NoteMode, State, TagInfo, Tag } from './types'
 import { api } from './api'
 import { mountEditor, setText } from './editor'
-// import hljs from 'highlight.js'
 
 const inputElement = ref(null)
 const contentElement = ref(null as HTMLElement | null)
@@ -122,7 +121,7 @@ const tagItems = computed((): TagInfo => {
 })
 
 const closeMenuOnSelect = () => {
-  return (window.innerWidth <= 600 || navigator.userAgent.indexOf("Lumi") != -1)
+  return window.innerWidth <= 600
 }
 
 const hljs = (window as any).hljs
@@ -353,6 +352,16 @@ continue     for          import       return       var
 
 * {
   box-sizing: border-box;
+}
+
+::-webkit-scrollbar {
+  background-color: transparent;
+  width: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: #dedede50
+
 }
 
 :root {

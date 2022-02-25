@@ -30,12 +30,42 @@ function mockAPI(): API {
         {
           path: 'Go Keywords.md',
           title: 'Go Keywords',
-          tags: ['go'],
+          tags: ['go', 'hi', '3', '2'],
         },
         {
           path: 'midway.md',
           title: 'midway',
           tags: ['tool'],
+        },
+        {
+          path: 'clipboard.md',
+          title: 'clipboard',
+          tags: [] as string[],
+        },
+        {
+          path: 'Go Keywords.md',
+          title: 'Go Keywords',
+          tags: ['go1'],
+        },
+        {
+          path: 'midway.md',
+          title: 'midway',
+          tags: ['tool1'],
+        },
+        {
+          path: 'clipboard.md',
+          title: 'clipboard',
+          tags: [] as string[],
+        },
+        {
+          path: 'Go Keywords.md',
+          title: 'Go Keywords',
+          tags: ['go2'],
+        },
+        {
+          path: 'midway.md',
+          title: 'midway',
+          tags: ['tool2'],
         },
       ]
     },
