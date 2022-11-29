@@ -1,8 +1,8 @@
 export interface NoteItem {
-  title: string
-  path: string
-  content: string
-  tags?: string[]
+  title: string;
+  path: string;
+  content: string;
+  tags?: string[];
 }
 
 export enum NoteMode {
@@ -21,11 +21,12 @@ export enum State {
   MenuOpen = "state.menuOpen",
   SelectedPath = "state.selectedPath",
   // SearchText = "state.searchText",
+  Key = "state.key",
 }
 
 export interface TagInfo {
-  total: number
-  tagged: number
-  untagged: number
-  tags: [string, number][]
+  total: number;
+  tagged: number;
+  untagged: number;
+  tags: [string, number][];
 }

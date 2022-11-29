@@ -1,54 +1,67 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
-import cookies from "browser-cookies"
-import { NoteItem, State } from '../types';
+import { onMounted, ref, watch } from "vue";
+import cookies from "browser-cookies";
+import { NoteItem, State } from "../types";
 
 const props = defineProps<{
-  items: NoteItem[]
-}>()
+  items: NoteItem[];
+}>();
 const emit = defineEmits<{
-  (e: 'select', note: NoteItem): void
-}>()
+  (e: "select", note: NoteItem): void;
+}>();
 
-const selectedPath = ref('')
-let restoreStateOnce = true
+const selectedPath = ref("");
+let restoreStateOnce = true;
 
 onMounted(() => {
   // props.items may be empty here
-  restoreState()
-})
+  restoreState();
+});
 
-watch(props, ()=> {
-  restoreState()
-})
+watch(props, () => {
+  restoreState();
+});
 
 function restoreState() {
+  console.log("restore selectedPath:", selectedPath.value);
   if (restoreStateOnce && props.items.length > 0) {
-    restoreStateOnce = false
-    const path = cookies.get(State.SelectedPath)
-    if (path !== '') {
-      for (let note of props.items) {
-        if (note.path === path) {
-          onItemClick(note)
-          break
-        }
-      }
+    restoreStateOnce = false;
+    const path = cookies.get(State.SelectedPath);
+    if (path) {
+      selectNote(path);
+    }
+  }
+}
+
+function selectNote(path: string) {
+  for (let note of props.items) {
+    if (note.path === path) {
+      onItemClick(note);
+      break;
     }
   }
 }
 
 function onItemClick(note: NoteItem) {
-  selectedPath.value = note.path
-  emit('select', note)
-  cookies.set(State.SelectedPath, selectedPath.value, {expires: 365})
+  selectedPath.value = note.path;
+  emit("select", note);
+  cookies.set(State.SelectedPath, selectedPath.value, { expires: 365 });
 }
+
+defineExpose({
+  selectNote,
+});
 </script>
 
 <template>
   <ul class="">
-    <li v-for="(note, index) in items" :key="index"
-        @click="onItemClick(note)"
-        :class="{active: selectedPath == note.path}"
-      >{{ note.title }}</li>
+    <li
+      v-for="(note, index) in items"
+      :key="index"
+      @click="onItemClick(note)"
+      :class="{ active: selectedPath == note.path }"
+    >
+      {{ note.title }}
+    </li>
   </ul>
 </template>

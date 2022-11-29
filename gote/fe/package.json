@@ -10,6 +10,7 @@
   "dependencies": {
     "browser-cookies": "^1.2.0",
     "marked": "^4.0.12",
+    "md5": "^2.3.0",
     "ts2go": "^1.0.0",
     "vue": "^3.2.25"
   },

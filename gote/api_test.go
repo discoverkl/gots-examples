@@ -14,7 +14,7 @@ var www embed.FS
 func init() {
 	fsys := os.DirFS("notes")
 	// fsys, _ := fs.Sub(www, "notes")
-	api = *NewAPI(fsys)
+	api = *NewAPI(fsys, "notes")
 }
 
 func BenchmarkListNotes(b *testing.B) {

@@ -1,332 +1,508 @@
 <script setup lang="ts">
-import { marked } from "marked"
-import cookies from "browser-cookies"
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
-import NoteList from './components/NoteList.vue'
-import { NoteItem, NoteMode, State, TagInfo, Tag } from './types'
-import { api } from './api'
-import { mountEditor, setText } from './editor'
+import { marked } from "marked";
+import cookies from "browser-cookies";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import NoteList from "./components/NoteList.vue";
+import { NoteItem, NoteMode, State, TagInfo, Tag } from "./types";
+import { api } from "./api";
+import { getText, mountEditor, setText } from "./editor";
+import md5 from "md5";
 
-const inputElement = ref(null)
-const contentElement = ref(null as HTMLElement | null)
-const searchElement = ref(null as HTMLElement | null)
+const inputElement = ref(null);
+const contentElement = ref(null as HTMLElement | null);
+const searchElement = ref(null as HTMLElement | null);
+const noteList = ref();
 
-const menuOpen = ref(false)
-const fullScreen = ref(false)
-const noteItems = ref([] as NoteItem[])
-const content = ref('')
-const noteMode = ref(NoteMode.ReadOnly)
-const searchText = ref('')
-const selectedTag = ref(Tag.All as string | Tag)
+const menuOpen = ref(false);
+const fullScreen = ref(false);
+const noteItems = ref([] as NoteItem[]);
+const content = ref("");
+const contentItem = ref(null as NoteItem | null);
+const noteMode = ref(NoteMode.ReadOnly);
+const searchText = ref("");
+const selectedTag = ref(Tag.All as string | Tag);
+const logined = ref(true); // avoid screen flash
 
 let editor: any;
 
 const htmlContent = computed(() => {
-  if (noteMode.value != NoteMode.Html) return ''
-  return marked.parse(content.value)
-})
+  if (noteMode.value != NoteMode.Html) return "";
+  return marked.parse(content.value);
+});
 
 const filterNoteItems = computed(() => {
   // filter by selected tag group
-  let tagNoteItems: NoteItem[] = []
-  const tag = selectedTag.value
+  let tagNoteItems: NoteItem[] = [];
+  const tag = selectedTag.value;
   switch (tag) {
     case Tag.All:
-      tagNoteItems = noteItems.value
-      break
+      tagNoteItems = noteItems.value;
+      break;
     case Tag.Tagged:
       for (let item of noteItems.value) {
         if (item.tags) {
-          tagNoteItems.push(item)
+          tagNoteItems.push(item);
         }
       }
-      break
+      break;
     case Tag.Untagged:
       for (let item of noteItems.value) {
         if (!item.tags) {
-          tagNoteItems.push(item)
+          tagNoteItems.push(item);
         }
       }
-      break
+      break;
     default:
-      if (typeof(tag) !== 'string') {
-        console.log("invalid tag value: ", tag)
-        tagNoteItems = noteItems.value
-        break
+      if (typeof tag !== "string") {
+        console.log("invalid tag value: ", tag);
+        tagNoteItems = noteItems.value;
+        break;
       }
       for (let item of noteItems.value) {
-        for (let one of item.tags??[]) {
+        for (let one of item.tags ?? []) {
           if (tag === one) {
-            tagNoteItems.push(item)
-            break
+            tagNoteItems.push(item);
+            break;
           }
         }
       }
-      break
+      break;
   }
 
   // filter by search text
   if (searchText.value.length <= 1) {
-    return tagNoteItems
+    return tagNoteItems;
   }
-  const exactItems: NoteItem[] = []
-  const items: NoteItem[] = []
-  const key = searchText.value
+  const exactItems: NoteItem[] = [];
+  const items: NoteItem[] = [];
+  const key = searchText.value;
   for (let item of tagNoteItems) {
-    for (let tag of item.tags??[]) {
+    for (let tag of item.tags ?? []) {
       if (tag === key) {
-        exactItems.push(item)
-        break
+        exactItems.push(item);
+        break;
       }
       if (tag.indexOf(key) !== -1) {
-        items.push(item)
-        break
+        items.push(item);
+        break;
       }
     }
   }
-  return exactItems.concat(items)
-})
+  return exactItems.concat(items);
+});
 
 const tagItems = computed((): TagInfo => {
-  let total = 0, tagged = 0, untagged = 0, tags = [] as [string, number][]
+  let total = 0,
+    tagged = 0,
+    untagged = 0,
+    tags = [] as [string, number][];
 
-  const tag2count = new Map<string, number>()
+  const tag2count = new Map<string, number>();
   for (let item of noteItems.value) {
-    total++
+    total++;
     if (item.tags == null || item.tags.length == 0) {
-      untagged++
-    } else  {
-      tagged++
+      untagged++;
+    } else {
+      tagged++;
       for (let tag of item.tags) {
-        tag2count.set(tag, (tag2count.get(tag) || 0) + 1)
+        tag2count.set(tag, (tag2count.get(tag) || 0) + 1);
       }
     }
   }
 
   // sort
-  const items = [] as [string, number][]
+  const items = [] as [string, number][];
   tag2count.forEach((value, key) => {
-    items.push([key, value])
-  })
+    items.push([key, value]);
+  });
   items.sort((a, b) => {
-    return a[0] == b[0] ? 0 : (a[0] < b[0] ? -1 : 1)
-  })
+    return a[0] == b[0] ? 0 : a[0] < b[0] ? -1 : 1;
+  });
 
   return {
     total: total,
     tagged: tagged,
     untagged: untagged,
     tags: items,
-  }
-})
+  };
+});
 
 const closeMenuOnSelect = () => {
-  return window.innerWidth <= 600
-}
+  return window.innerWidth <= 600;
+};
 
-const hljs = (window as any).hljs
+const hljs = (window as any).hljs;
 marked.setOptions({
-  highlight: function(code, lang) {
-    if (lang === '') return code
-    const ret = hljs.highlight(code, {language: lang}).value
-    return ret
-  }
-})
+  highlight: function (code, lang) {
+    if (lang === "") return code;
+    const ret = hljs.highlight(code, { language: lang }).value;
+    return ret;
+  },
+});
 
 //
 // init
 //
 onMounted(async () => {
-  const stateMenuOpen = cookies.get(State.MenuOpen) || JSON.stringify(true)
-  menuOpen.value = JSON.parse(stateMenuOpen)
-  fullScreen.value = true
-  noteItems.value = await api.listNotes()
-  noteMode.value = NoteMode.Html
+  const stateMenuOpen = cookies.get(State.MenuOpen) || JSON.stringify(true);
+  menuOpen.value = JSON.parse(stateMenuOpen);
+  fullScreen.value = true;
+  await login();
+  noteItems.value = await api.listNotes();
+  noteMode.value = NoteMode.Html;
   // searchText.value = cookies.get(State.SearchText) || ''
 
-  editor = await mountEditor(inputElement.value)
-  handlePageClick(true)
-  document.addEventListener("keyup", onKeyUp)
-})
+  editor = await mountEditor(inputElement.value);
+  handlePageClick(true);
+  document.addEventListener("keyup", onKeyUp);
+});
 
 onUnmounted(() => {
-  handlePageClick(false)
-  document.removeEventListener("keyup", onKeyUp)
-})
+  handlePageClick(false);
+  document.removeEventListener("keyup", onKeyUp);
+});
 
 // TODO: use editor component
-watch([noteMode, content], () => {
+watch(content, () => {
   if (editor == null) {
-    return
+    return;
   }
   if (noteMode.value == NoteMode.ReadWrite) {
-    setText(editor, content.value, ".md")
-  } else {
-    setText(editor, '', ".md")
+    setText(editor, content.value, ".md");
   }
-})
+});
 
-watch([menuOpen, noteMode], ()=>{
-  const s = document.body.style
+watch(noteMode, () => {
+  if (editor == null) {
+    return;
+  }
+  if (noteMode.value == NoteMode.ReadWrite) {
+    setText(editor, content.value, ".md");
+  } else {
+    saveNote();
+    setText(editor, "", ".md");
+  }
+});
+
+watch([menuOpen, noteMode], () => {
+  const s = document.body.style;
   if (menuOpen.value || noteMode.value == NoteMode.ReadWrite) {
     // body css default to open and none-readwrite
-    s.removeProperty("height")
-    s.removeProperty("overflow")
+    s.removeProperty("height");
+    s.removeProperty("overflow");
   } else {
-    s.height = "initial"
-    s.overflow = "auto"
+    s.height = "initial";
+    s.overflow = "auto";
   }
-})
+});
 
-watch(menuOpen, ()=> {
-  cookies.set(State.MenuOpen, JSON.stringify(menuOpen.value), {expires: 365})
-})
+watch(menuOpen, () => {
+  cookies.set(State.MenuOpen, JSON.stringify(menuOpen.value), { expires: 365 });
+});
+
+async function saveNote() {
+  if (editor == null) {
+    return;
+  }
+  if (contentItem.value == null) {
+    return;
+  }
+  let oldContent = contentItem.value.content;
+  let newContent = getText(editor);
+  // console.log("old:", oldContent);
+  // console.log("new:", newContent);
+  if (newContent == oldContent) {
+    return;
+  }
+
+  let newItem: NoteItem;
+  try {
+    contentItem.value.content = newContent;
+    newItem = await api.saveNote(contentItem.value);
+    content.value = newContent;
+  } catch (ex) {
+    contentItem.value.content = oldContent;
+    console.log("save note failed:", ex);
+    return;
+  }
+
+  // update title and path
+  if (contentItem.value.title != newItem.title) {
+    contentItem.value.title = newItem.title;
+    contentItem.value.path = newItem.path;
+    noteList.value.selectNote(newItem.path);
+  }
+}
+
+async function addNote() {
+  try {
+    let item = await api.addNote();
+    noteItems.value.push(item);
+    let items = [...noteItems.value];
+    items.sort((a, b) =>
+      a.title.toLowerCase() < b.title.toLowerCase() ? -1 : 1
+    );
+    noteItems.value = items;
+    noteList.value.selectNote(item.path);
+    noteMode.value = NoteMode.ReadWrite;
+  } catch (ex) {
+    console.log("add note failed:", ex);
+  }
+}
 
 async function selectNote(note: NoteItem) {
   // cookies.set(State.SearchText, searchText.value, {expires: 365})
-  if (closeMenuOnSelect()) menuOpen.value = false
-  window.document.title = note.title
-  const noteContent = (await api.getNote(note.path)).content
+  if (closeMenuOnSelect()) menuOpen.value = false;
+  window.document.title = note.title;
+  const noteContent = (await api.getNote(note.path)).content;
+  note.content = noteContent;
   if (content.value != noteContent) {
     if (contentElement.value) {
-      contentElement.value.scrollTo(0, 0)
+      contentElement.value.scrollTo(0, 0);
     }
-    content.value = noteContent
+    content.value = noteContent;
+  }
+  if (contentItem.value != note) {
+    contentItem.value = note;
   }
 }
 
 function selectTag(tag: string | Tag) {
-  selectedTag.value = tag
+  selectedTag.value = tag;
   if (tag != Tag.All && tag != Tag.Tagged) {
-    searchText.value = ''
+    searchText.value = "";
   }
 }
 
 function toggleEdit() {
   if (noteMode.value == NoteMode.ReadWrite) {
-    noteMode.value = NoteMode.Html
+    noteMode.value = NoteMode.Html;
   } else {
-    noteMode.value = NoteMode.ReadWrite
+    noteMode.value = NoteMode.ReadWrite;
   }
 }
 
 function noteContentClick(event: MouseEvent) {
-  const width = window.innerWidth
-  const pos = event.clientX
-  let page = 0
+  const width = window.innerWidth;
+  const pos = event.clientX;
+  let page = 0;
   if (pos <= width / 3) {
-    page = -1
-  } else if (pos >= width * 2 / 3) {
-    page = 1
+    page = -1;
+  } else if (pos >= (width * 2) / 3) {
+    page = 1;
   }
   if (page !== 0) {
-    event.preventDefault()
-    scrollPage(page)
+    event.preventDefault();
+    scrollPage(page);
+  }
+}
+
+// login with 2 steps:
+// 1. login from cookie
+// 2. login from UI
+let loginResolve;
+async function login() {
+  // from cookie
+  const hash = cookies.get(State.Key);
+  if (hash) {
+    let succ = await api.login(hash);
+    if (succ) {
+      logined.value = true;
+      return;
+    }
+  }
+  // 1/2: from UI
+  logined.value = false;
+  return new Promise((resolve, reject) => {
+    loginResolve = resolve;
+  });
+}
+
+// 2/2: from UI
+async function loginKey(event: KeyboardEvent) {
+  if (event.key == "Enter") {
+    const input = event.target as HTMLInputElement;
+    const key = input.value;
+    input.value = "";
+    if (key == "") {
+      return;
+    }
+    const hash = md5(key);
+    // console.log("hash:", hash);
+    let succ = await api.login(hash);
+    if (succ) {
+      logined.value = true;
+      cookies.set(State.Key, hash, { expires: 365 });
+      loginResolve();
+    } else {
+      alert("login failed");
+    }
   }
 }
 
 function scrollPage(offset: number) {
-  const pageSize = window.innerHeight - 40 - 14
-  window.scrollTo(window.scrollX, window.scrollY + offset * pageSize)
+  const pageSize = window.innerHeight - 40 - 14;
+  window.scrollTo(window.scrollX, window.scrollY + offset * pageSize);
 }
 
-function usePageClick(onclick: (event: MouseEvent) => void): (on: boolean) => void {
-  let drag = 0
-  const mousedown = () => drag = 0
-  const mousemove = () => drag++
+function usePageClick(
+  onclick: (event: MouseEvent) => void
+): (on: boolean) => void {
+  let drag = 0;
+  const mousedown = () => (drag = 0);
+  const mousemove = () => drag++;
   const mouseup = (event) => {
-    const click = (drag < 10)
+    const click = drag < 10;
     if (click && !menuOpen.value && noteMode.value != NoteMode.ReadWrite) {
-      onclick(event)
+      onclick(event);
     }
-  }
+  };
 
   const handlePageClick = (on: boolean) => {
     if (on) {
-      document.addEventListener('mousedown', mousedown)
-      document.addEventListener('mousemove', mousemove)
-      document.addEventListener('mouseup', mouseup)
+      document.addEventListener("mousedown", mousedown);
+      document.addEventListener("mousemove", mousemove);
+      document.addEventListener("mouseup", mouseup);
     } else {
-      document.removeEventListener('mousedown', mousedown)
-      document.removeEventListener('mousemove', mousemove)
-      document.removeEventListener('mouseup', mouseup)
+      document.removeEventListener("mousedown", mousedown);
+      document.removeEventListener("mousemove", mousemove);
+      document.removeEventListener("mouseup", mouseup);
     }
-  }
-  return handlePageClick
+  };
+  return handlePageClick;
 }
-const handlePageClick = usePageClick(noteContentClick)
+const handlePageClick = usePageClick(noteContentClick);
 
 function onKeyUp(event: KeyboardEvent) {
   if (event.key == "Escape") {
-    searchText.value = ''
-    if (searchElement.value != null) searchElement.value.focus()
-    event.preventDefault()
+    searchText.value = "";
+    if (searchElement.value != null) searchElement.value.focus();
+    event.preventDefault();
   }
 }
 </script>
 
 <template>
-<div class="root" :class="{close: !menuOpen, fullscreen: fullScreen}">
-  <span class="material-icons menu-icon" @click="menuOpen = !menuOpen">
-    {{ menuOpen ? "menu_open" : "menu" }}</span>
-  <div class="nav border">
-    <div class="nav-head"></div>
-    <div class="content">
-      <div class="item-1" :class="{active: selectedTag == Tag.All}" @click="selectTag(Tag.All)">
-        <span class="material-icons icon">description</span>
-        <span class="text">All Notes</span>
-        <span class="note-count">{{ tagItems.total }}</span>
+  <div class="root" :class="{ close: !menuOpen, fullscreen: fullScreen }">
+    <div class="login" v-show="!logined">
+      <span>Login:</span
+      ><input type="password" placeholder="" @keyup="loginKey" />
+    </div>
+    <span class="material-icons menu-icon" @click="menuOpen = !menuOpen">
+      {{ menuOpen ? "menu_open" : "menu" }}</span
+    >
+    <div class="nav border">
+      <div class="nav-head"></div>
+      <div class="content">
+        <div
+          class="item-1"
+          :class="{ active: selectedTag == Tag.All }"
+          @click="selectTag(Tag.All)"
+        >
+          <span class="material-icons icon">description</span>
+          <span class="text">All Notes</span>
+          <span class="note-count">{{ tagItems.total }}</span>
+        </div>
+        <div
+          class="item-1"
+          :class="{ active: selectedTag == Tag.Tagged }"
+          @click="selectTag(Tag.Tagged)"
+        >
+          <span class="material-icons icon">local_offer</span>
+          <span class="text">Tags</span>
+          <span class="note-count">{{ tagItems.tagged }}</span>
+        </div>
+        <ul class="demo">
+          <li class="item-2">
+            <span class="text">typescript</span
+            ><span class="note-count">2</span>
+          </li>
+          <li class="item-2">
+            <span class="text">vue</span><span class="note-count">1</span>
+          </li>
+          <li class="item-2">
+            <span class="text">go</span><span class="note-count">1</span>
+          </li>
+        </ul>
+        <ul class="">
+          <li
+            class="item-2"
+            v-for="(kv, index) in tagItems.tags"
+            :key="index"
+            :class="{ active: selectedTag === kv[0] }"
+            @click="selectTag(kv[0])"
+          >
+            <span class="text">{{ kv[0] }}</span>
+            <span class="note-count">{{ kv[1] }}</span>
+          </li>
+        </ul>
+        <div
+          class="item-1"
+          :class="{ active: selectedTag == Tag.Untagged }"
+          @click="selectTag(Tag.Untagged)"
+        >
+          <span class="material-icons icon">edit_off</span>
+          <span class="text">Untagged</span>
+          <span class="note-count">{{ tagItems.untagged }}</span>
+        </div>
       </div>
-      <div class="item-1" :class="{active: selectedTag == Tag.Tagged}" @click="selectTag(Tag.Tagged)">
-        <span class="material-icons icon">local_offer</span>
-        <span class="text">Tags</span>
-        <span class="note-count">{{ tagItems.tagged }}</span>
+    </div>
+    <div class="note-list right-border">
+      <div class="head">
+        <div class="search-box">
+          <input
+            class="search"
+            type="text"
+            ref="searchElement"
+            placeholder="Search..."
+            v-model="searchText"
+            spellcheck="false"
+          />
+          <span class="material-icons icon search-icon">search</span>
+        </div>
+        <span class="material-icons icon add-icon icon-btn" @click="addNote"
+          >add</span
+        >
       </div>
-      <ul class="demo">
-        <li class="item-2"><span class="text">typescript</span><span class="note-count">2</span></li>
-        <li class="item-2"><span class="text">vue</span><span class="note-count">1</span></li>
-        <li class="item-2"><span class="text">go</span><span class="note-count">1</span></li>
-      </ul>
-      <ul class="">
-        <li class="item-2" v-for="(kv, index) in tagItems.tags" :key="index"
-          :class="{active: selectedTag === kv[0]}" @click="selectTag(kv[0])"
-          ><span class="text">{{ kv[0] }}</span>
-          <span class="note-count">{{ kv[1] }}</span></li>
-      </ul>
-      <div class="item-1" :class="{active: selectedTag == Tag.Untagged}" @click="selectTag(Tag.Untagged)"><span class="material-icons icon">edit_off</span>
-        <span class="text">Untagged</span>
-        <span class="note-count">{{ tagItems.untagged }}</span>
+      <div class="content">
+        <NoteList
+          ref="noteList"
+          :items="filterNoteItems"
+          @select="selectNote"
+        />
+        <ul class="demo">
+          <li>clipboard</li>
+          <li class="active">Go Keywords</li>
+          <li>midway</li>
+          <li>gote</li>
+          <li>Web Tech</li>
+        </ul>
       </div>
     </div>
-  </div>
-  <div class="note-list right-border">
-    <div class="head">
-      <input class="search" type="text" ref="searchElement" placeholder="Search by tag..." v-model="searchText" spellcheck="false" />
-      <span class="material-icons icon search-icon">search</span>
-    </div>
-    <div class="content">
-      <NoteList :items="filterNoteItems" @select="selectNote" />
-      <ul class="demo">
-        <li>clipboard</li>
-        <li class="active">Go Keywords</li>
-        <li>midway</li>
-        <li>gote</li>
-        <li>Web Tech</li>
-      </ul>
-    </div>
-  </div>
-  <div class="note">
-    <div class="head">
-      <span class="material-icons icon"
-        :class="{active: noteMode == NoteMode.ReadWrite}"
-        @click="toggleEdit"
-        >edit</span>
-    </div>
-    <div class="content" ref="contentElement">
-      <pre class="readonly" v-if="noteMode == NoteMode.ReadOnly">{{ content }}</pre>
-      <div class="readwrite" v-show="noteMode == NoteMode.ReadWrite" ref="inputElement"></div>
-      <div class="html" v-if="noteMode == NoteMode.Html" v-html="htmlContent"></div>
-      <pre class="demo">
+    <div class="note">
+      <div class="head">
+        <span
+          class="material-icons icon"
+          :class="{ active: noteMode == NoteMode.ReadWrite }"
+          @click="toggleEdit"
+          >edit</span
+        >
+      </div>
+      <div class="content" ref="contentElement">
+        <pre class="readonly" v-if="noteMode == NoteMode.ReadOnly">{{
+          content
+        }}</pre>
+        <div
+          class="readwrite"
+          v-show="noteMode == NoteMode.ReadWrite"
+          ref="inputElement"
+        ></div>
+        <div
+          class="html"
+          v-if="noteMode == NoteMode.Html"
+          v-html="htmlContent"
+        ></div>
+        <pre class="demo">
 Ref to: https://go.dev/ref/spec#Keywords
 
 ```
@@ -338,14 +514,14 @@ case         defer        go           map          struct
 chan         else         goto         package      switch
 const        fallthrough  if           range        type
 continue     for          import       return       var
-```</pre>
+```</pre
+        >
+      </div>
     </div>
   </div>
-</div>
 </template>
 
 <style>
-
 /*
 ** Layout CSS
 */
@@ -360,8 +536,7 @@ continue     for          import       return       var
 }
 
 ::-webkit-scrollbar-thumb {
-  background-color: #dedede50
-
+  background-color: #dedede50;
 }
 
 :root {
@@ -377,7 +552,8 @@ continue     for          import       return       var
   border-width: 0 1px 0 0;
 }
 
-html, body {
+html,
+body {
   height: 100%;
 }
 
@@ -421,6 +597,34 @@ body {
   max-width: none;
   max-height: none;
   border-radius: 0;
+}
+
+/* login */
+.login {
+  z-index: 100;
+  display: flex;
+  position: absolute;
+  height: 100%;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  background-color: black;
+  font-size: 32px;
+  color: white;
+  /* opacity: 0.5; */
+}
+
+.login input {
+  margin-left: 10px;
+  font-size: 32px;
+  height: 55px;
+  border-radius: 10px;
+  background-color: yellow;
+  width: 50%;
+}
+
+.login input:focus {
+  outline: none;
 }
 
 /* left */
@@ -480,12 +684,14 @@ body {
   overflow: auto;
 }
 
-.content > div, ul, pre {
-  display: var(--content-display)
+.content > div,
+ul,
+pre {
+  display: var(--content-display);
 }
 
 .content > .demo {
-  display: var(--demo-display)
+  display: var(--demo-display);
 }
 
 .menu-icon {
@@ -505,7 +711,17 @@ body {
 }
 
 .head .icon.active {
-  color: #ef6d02
+  color: #ef6d02;
+}
+
+.icon-btn {
+  border-style: solid;
+  height: 20px;
+  font-size: 18px;
+  border-radius: 5px;
+  border-color: #dadada;
+  padding-left: 5px;
+  padding-right: 5px;
 }
 
 .demo {
@@ -513,35 +729,36 @@ body {
 }
 
 /* @media (max-width: 600px) { */
-  .menu-icon {
-    display: block;
-  }
+.menu-icon {
+  display: block;
+}
 
-  .close .nav, .close .note-list {
-    display: none;
-  }
+.close .nav,
+.close .note-list {
+  display: none;
+}
 
-  .close .menu-icon {
-    color: black;
-  }
+.close .menu-icon {
+  color: black;
+}
 
-  /* ----------------- */
-  /* for sticky scroll */
-  .close .menu-icon {
-    z-index: 1;
-    position: fixed;
-  }
-  .close .note .head {
-    position: fixed;
-    width: 100%;
-    border-style: var(--border-style);
-    border-width: 1px;
-    margin: -1px;
-  }
-  .close .note .content {
-    margin-top: calc(38px + 1px)
-  }
-  /* ----------------- */
+/* ----------------- */
+/* for sticky scroll */
+.close .menu-icon {
+  z-index: 1;
+  position: fixed;
+}
+.close .note .head {
+  position: fixed;
+  width: 100%;
+  border-style: var(--border-style);
+  border-width: 1px;
+  margin: -1px;
+}
+.close .note .content {
+  margin-top: calc(38px + 1px);
+}
+/* ----------------- */
 /* } */
 
 /*
@@ -591,18 +808,24 @@ body {
 }
 .nav .item-2 .text {
   flex: 1;
-  font-size: 13px;;
+  font-size: 13px;
 }
 
 /*
 ** .note-list CSS
 */
-.note-list>.head {
+.note-list > .head {
+  display: flex;
+  /* position: relative; */
+}
+.note-list > .head > .search-box {
   display: flex;
   position: relative;
+  width: 100%;
 }
-.note-list>.head .search {
-  height: 22px;
+
+.note-list > .head .search {
+  /* height: 22px; */
   border-radius: 4px;
   border-width: 1px;
   border-color: #e5e5e5;
@@ -611,15 +834,21 @@ body {
   margin: 6px 12px;
   padding-left: 6px;
 }
-.note-list>.head .search:focus {
+.note-list > .head .search:focus {
   outline: none;
 }
 
-.note-list>.head .search-icon {
+.note-list > .head .search-icon {
   position: absolute;
   right: 16px;
-  top: 12px;
+  top: 10px;
   margin: 0;
+}
+
+.note-list > .head .add-icon {
+  float: right;
+  margin-right: 10px;
+  margin-top: 8px;
 }
 
 .note-list ul {
@@ -647,7 +876,6 @@ body {
   padding-left: 12px;
 }
 .close .note .head {
-
   padding-left: calc(24px + 12px + 12px);
 }
 
@@ -689,14 +917,17 @@ body {
     white-space: pre-wrap;
   }
   /* interaction */
-  .nav, .note-list, .menu-icon, .note .head {
+  .nav,
+  .note-list,
+  .menu-icon,
+  .note .head {
     display: none;
   }
   .content {
     overflow: hidden;
   }
   .close .note .content {
-    margin-top: 0   /* the sticky header in close mode is gone, so reset margin-top */
+    margin-top: 0; /* the sticky header in close mode is gone, so reset margin-top */
   }
 }
 </style>

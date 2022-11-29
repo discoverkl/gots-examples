@@ -6,6 +6,8 @@ import (
 	"io/fs"
 	"log"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/discoverkl/gots/ui"
 )
@@ -17,10 +19,12 @@ var root embed.FS
 var goNotes embed.FS
 
 var port int
+var keyPath string
 
 func main() {
 	// parse arguments: 'path', 'port'
 	flag.IntVar(&port, "p", -1, "binding port")
+	flag.StringVar(&keyPath, "key", "", "login key")
 	flag.Parse()
 
 	path := ""
@@ -31,10 +35,12 @@ func main() {
 
 	// prepare data
 	var notes fs.FS
+	var abspath string
 	if path == "" {
 		notes, _ = fs.Sub(goNotes, "notes")
 	} else {
-		notes = os.DirFS(path)
+		abspath, _ = filepath.Abs(path)
+		notes = os.DirFS(abspath)
 	}
 
 	// options
@@ -48,8 +54,21 @@ func main() {
 		ops = append(ops, ui.Mode("app"))
 	}
 
+	api := NewAPI(notes, abspath)
+	// login key
+	if keyPath != "" {
+		data, err := os.ReadFile(keyPath)
+		if err != nil {
+			log.Fatalf("read key failed: %v", err)
+		}
+		key := strings.TrimSpace(string(data))
+		api.SetLoginKey(key)
+	}
+
 	// create and run
 	app := ui.New(ops...)
-	app.BindObject(NewAPI(notes))
-	app.Run()
+	app.BindObject(api)
+	if err := app.Run(); err != nil {
+		log.Fatal(err)
+	}
 }
